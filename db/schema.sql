@@ -20,3 +20,14 @@ CREATE TABLE IF NOT EXISTS checklist.imports (
 ALTER TABLE checklist.tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE checklist.subtasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE checklist.imports ENABLE ROW LEVEL SECURITY;
+
+-- Migração aditiva: tarefas antigas ficam preservadas até a atribuição explícita.
+ALTER TABLE checklist.tasks ADD COLUMN IF NOT EXISTS owner_id uuid;
+CREATE INDEX IF NOT EXISTS tasks_owner_id_idx ON checklist.tasks(owner_id);
+CREATE TABLE IF NOT EXISTS checklist.user_imports (
+    owner_id uuid NOT NULL,
+    id uuid NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (owner_id, id)
+);
+ALTER TABLE checklist.user_imports ENABLE ROW LEVEL SECURITY;

@@ -32,7 +32,7 @@ form {
 
 label { color: #bec9d9; font-size: 14px; }
 
-input[type="text"] {
+input[type="text"], input[type="email"], input[type="password"] {
     width: 100%;
     min-width: 0;
     height: 44px;
@@ -167,6 +167,17 @@ input[type="checkbox"] {
 input:checked + span { text-decoration: line-through; color: #a5b2c5; }
 #storage-message { color: #ffd499; }
 #storage-message:empty { display: none; }
+
+#auth-panel { max-width: 480px; margin: 32px auto; padding: 24px; border: 1px solid #39465a; border-radius: 12px; background: #202936; }
+#auth-panel p { color: #bec9d9; }
+#auth-form { grid-template-columns: minmax(0, 1fr); }
+#auth-form label:not(:first-child) { margin-top: 12px; }
+.auth-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+.auth-actions button { flex: 1; }
+.account-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+#account-email { min-width: 0; overflow-wrap: anywhere; color: #bec9d9; }
+#sign-out { flex-shrink: 0; }
+#auth-panel #auth-message { color: #ffd499; }
 
 @media (max-width: 480px) {
     body { margin: 24px auto; padding: 0 16px; }

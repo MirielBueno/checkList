@@ -5,10 +5,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Checklist</title>
     <link rel="stylesheet" href="/style.css">
+    <link rel="icon" href="/icon.png">
 </head>
 <body>
     <main>
         <h1>My Checklist</h1>
+        <section id="auth-panel" aria-labelledby="auth-title">
+            <h2 id="auth-title">Your checklists, in your account</h2>
+            <p>Sign in or create an account to keep your tasks private.</p>
+            <form id="auth-form">
+                <label for="auth-email">Email</label>
+                <input id="auth-email" type="email" autocomplete="email" required>
+                <label for="auth-password">Password</label>
+                <input id="auth-password" type="password" autocomplete="current-password" required>
+                <div class="auth-actions">
+                    <button type="submit" value="signin">Sign in</button>
+                    <button type="submit" value="signup">Create account</button>
+                </div>
+            </form>
+            <p id="auth-message" role="status"></p>
+        </section>
+        <section id="workspace" hidden aria-label="Your tasks">
+        <div class="account-bar">
+            <span id="account-email"></span>
+            <button type="button" id="sign-out">Sign out</button>
+        </div>
         <form id="form-task">
             <label for="new-task">New task</label>
             <input type="text" id="new-task" name="task" placeholder="Enter a task" maxlength="200" required>
@@ -21,7 +42,9 @@
         </div>
         <p id="empty-state" hidden>No tasks yet. Create your first checklist above.</p>
         <ul id="list-task"></ul>
+        </section>
     </main>
+    <script src="/vendor/supabase.js"></script>
     <script type="module" src="/script.js"></script>
 </body>
 </html>

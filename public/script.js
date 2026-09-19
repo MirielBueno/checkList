@@ -1,5 +1,6 @@
 ﻿import { createTaskView } from "./tasks.js";
-import { api } from "./api.js";
+import { api, configureAuth, setSessionIdentity } from "./api.js";
+import { getAccessToken, initializeAuth } from "./auth.js";
 import { loadTasks } from "./storage.js";
 
 const form = document.querySelector("#form-task");
@@ -9,63 +10,107 @@ const message = document.querySelector("#storage-message");
 const reloadButton = document.querySelector("#reload-tasks");
 const importButton = document.querySelector("#import-tasks");
 const emptyState = document.querySelector("#empty-state");
+const authPanel = document.querySelector("#auth-panel");
+const workspace = document.querySelector("#workspace");
 let tasks = [];
 let ready = false;
+let userId = null;
+let generation = 0;
+let renderTask;
 
 function showMessage(text) { message.textContent = text; }
 function updateEmptyState() { emptyState.hidden = !ready || tasks.length > 0; }
-const renderTask = createTaskView(taskList, showMessage, task => {
-    tasks = tasks.filter(current => current !== task);
+function toggleControls(disabled) {
+    form.querySelector("button").disabled = disabled;
+    reloadButton.disabled = disabled;
+    importButton.disabled = disabled;
+}
+function importKey(suffix) { return "checklist-import-" + userId + "-" + suffix; }
+function updateImportButton() {
+    try {
+        importButton.hidden = loadTasks().length === 0 ||
+            localStorage.getItem("checklist-import-complete") === "true" ||
+            localStorage.getItem(importKey("complete")) === "true";
+    } catch { importButton.hidden = true; }
+}
+function handleSession(session) {
+    const nextId = session?.user?.id ?? null;
+    if (nextId === userId && (ready || nextId === null)) {
+        authPanel.hidden = Boolean(nextId);
+        workspace.hidden = !nextId;
+        return;
+    }
+    userId = nextId;
+    const version = ++generation;
+    setSessionIdentity(userId);
+    ready = false;
+    tasks = [];
+    taskList.replaceChildren();
+    taskField.value = "";
+    showMessage("");
+    toggleControls(true);
     updateEmptyState();
-    taskField.focus();
-});
+    authPanel.hidden = Boolean(userId);
+    workspace.hidden = !userId;
+    document.querySelector("#account-email").textContent = session?.user?.email ?? "";
+    if (!userId) return;
+    renderTask = createTaskView(taskList,
+        text => { if (version === generation) showMessage(text); },
+        task => {
+            if (version !== generation) return;
+            tasks = tasks.filter(current => current !== task);
+            updateEmptyState();
+            taskField.focus();
+        });
+    updateImportButton();
+    refresh();
+}
 
 async function refresh() {
+    const version = generation;
     ready = false;
-    form.querySelector("button").disabled = true;
-    reloadButton.disabled = true;
-    importButton.disabled = true;
+    toggleControls(true);
+    taskList.inert = true;
     showMessage("Loading tasks...");
     try {
         const loaded = await api.list();
+        if (version !== generation) return;
         tasks = loaded;
         taskList.replaceChildren();
         tasks.forEach(task => renderTask(task));
         ready = true;
         showMessage("");
     } catch (error) {
-        showMessage("Could not load tasks. Check the server and database, then click Reload.");
+        if (version === generation) showMessage(error.message || "Could not load tasks. Click Reload to try again.");
     } finally {
-        form.querySelector("button").disabled = !ready;
-        reloadButton.disabled = false;
-        importButton.disabled = !ready;
-        updateEmptyState();
+        if (version === generation) {
+            toggleControls(!ready);
+            reloadButton.disabled = false;
+            taskList.inert = false;
+            updateEmptyState();
+        }
     }
 }
 
 form.addEventListener("submit", async event => {
     event.preventDefault();
     const title = taskField.value.trim();
-    if (!title || !ready) return;
-    const button = form.querySelector("button");
-    if (button.disabled) return;
-    button.disabled = true;
-    reloadButton.disabled = true;
-    importButton.disabled = true;
+    if (!title || !ready || form.querySelector("button").disabled) return;
+    const version = generation;
+    toggleControls(true);
     showMessage("Saving...");
     try {
         const task = await api.create(title);
+        if (version !== generation) return;
         tasks.push(task);
         renderTask(task, true);
         taskField.value = "";
         showMessage("");
         updateEmptyState();
     } catch (error) {
-        showMessage(error.message || "Could not create task. Please try again.");
+        if (version === generation) showMessage(error.message || "Could not create task.");
     } finally {
-        button.disabled = false;
-        reloadButton.disabled = false;
-        importButton.disabled = false;
+        if (version === generation) toggleControls(false);
     }
 });
 
@@ -77,35 +122,42 @@ reloadButton.addEventListener("click", () => {
     refresh();
 });
 
-// O backup antigo fica preservado. O identificador torna a importação repetível sem duplicar.
-try {
-    importButton.hidden = loadTasks().length === 0 || localStorage.getItem("checklist-import-complete") === "true";
-} catch (error) {
-    showMessage("The local backup could not be read.");
-}
 importButton.addEventListener("click", async () => {
     if (!ready || taskList.querySelector('[aria-busy="true"]')) return;
-    importButton.disabled = true;
-    reloadButton.disabled = true;
-    form.querySelector("button").disabled = true;
+    if (!window.confirm("Import the tasks saved in this browser into your signed-in account?")) return;
+    const version = generation;
+    const idKey = importKey("id");
+    const doneKey = importKey("complete");
+    toggleControls(true);
+    taskList.inert = true;
     try {
         const localTasks = loadTasks();
-        let id = localStorage.getItem("checklist-import-id");
+        let id = localStorage.getItem(idKey);
         if (!id) {
             id = crypto.randomUUID();
-            localStorage.setItem("checklist-import-id", id);
+            localStorage.setItem(idKey, id);
         }
         await api.importTasks(id, localTasks);
-        localStorage.setItem("checklist-import-complete", "true");
+        if (version !== generation) return;
+        localStorage.setItem(doneKey, "true");
         importButton.hidden = true;
         await refresh();
     } catch (error) {
-        showMessage(error.message || "Import failed. Your local backup is unchanged.");
+        if (version === generation) showMessage(error.message || "Import failed. Your local backup is unchanged.");
     } finally {
-        importButton.disabled = !ready;
-        reloadButton.disabled = false;
-        form.querySelector("button").disabled = !ready;
+        if (version === generation) {
+            toggleControls(!ready);
+            reloadButton.disabled = false;
+            taskList.inert = false;
+        }
     }
 });
 
-refresh();
+configureAuth(getAccessToken, () => {
+    handleSession(null);
+    document.querySelector("#auth-message").textContent = "Your session expired. Please sign in again.";
+});
+initializeAuth(handleSession).catch(error => {
+    document.querySelector("#auth-message").textContent = error.message || "Could not load login. Reload to try again.";
+    document.querySelectorAll("#auth-form button").forEach(button => button.disabled = true);
+});

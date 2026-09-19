@@ -1,4 +1,5 @@
 ﻿import { test, expect, jest, beforeEach } from "@jest/globals";
+import { configureAuth, setSessionIdentity } from "../public/api.js";
 import { createTaskView } from "../public/tasks.js";
 
 let focus;
@@ -25,6 +26,8 @@ class Element {
 }
 beforeEach(() => {
     focus = null; message = ""; approved = true;
+    configureAuth(async () => "test-token", () => {});
+    setSessionIdentity("test-user");
     globalThis.document = { createElement: tag => new Element(tag) };
     globalThis.window = { confirm: () => approved, prompt: () => null };
     globalThis.fetch = jest.fn();
