@@ -88,6 +88,7 @@ export function createApp(repository, auth = null) {
     });
     app.use(express.static(fileURLToPath(new URL("./public", import.meta.url))));
     app.use((error, req, res, next) => {
+        console.error("API error:", error.code ?? "unknown", error.message);
         const status = error.status === 400 || error.status === 413 ? error.status : 503;
         res.status(status).json({ error: status === 503 ? "Database unavailable. Please try again." : status === 413 ? "Request too large." : error instanceof SyntaxError ? "Invalid JSON." : error.message });
     });
