@@ -1,0 +1,18 @@
+node_modules/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Local agent instructions
+[Aa][Gg][Ee][Nn][Tt][Ss].[Mm][Dd]
+.codex/
+.agents/
+
+# Logs and test output
+*.log
+coverage/
+
+# Old ignore filename (Git uses .gitignore)
+gitignore.git
