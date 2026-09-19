@@ -1,40 +1,18 @@
-import express from "express";
+﻿import { createApp } from "./app.js";
+import { createPool } from "./db/pool.js";
+import { createRepository } from "./db/repository.js";
 
-const tasks = [];
-const app = express();
-
-app.use(express.json());
-app.use(express.static("public"));
-
-app.get("/", (req, res) => {
-
-    res.send("Server ok.");
-});
-app.get("/api/tasks", (req, res) =>{
-    res.json(tasks);
-});
-app.listen(3000, () => {
-
-    console.log("Server OK.");
-});
-app.post("/api/tasks", (req, res) => {
-    const title = req.body?.title;
-
-    if (typeof title !== "string" || title.trim() === "") {
-        return res.status(400).json({
-            error: "A task title is required"
-        });
+try {
+    const pool = createPool();
+    pool.on("error", () => console.error("Conexão com o banco interrompida."));
+    const app = createApp(createRepository(pool));
+    const port = process.env.PORT || 3000;
+    const host = process.env.HOST || "127.0.0.1";
+    const server = app.listen(port, host, () => console.log("Checklist: http://" + host + ":" + port));
+    for (const signal of ["SIGINT", "SIGTERM"]) {
+        process.once(signal, () => server.close(() => pool.end()));
     }
-
-    const task = {
-        title: title.trim(),
-        subtasks: []
-    };
-
-    tasks.push(task);
-
-    res.status(201).json(task);
-});
-app.get("/api/health", (req, res) => {
-    res.json({ status: "ok" });
-});
+} catch (error) {
+    console.error("Não foi possível iniciar. Confira DATABASE_URL no .env.");
+    process.exitCode = 1;
+}

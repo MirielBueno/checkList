@@ -11,10 +11,15 @@
         <h1>My Checklist</h1>
         <form id="form-task">
             <label for="new-task">New task</label>
-            <input type="text" id="new-task" name="task" placeholder="Enter a task" required>
-            <button type="submit">Add task</button>
+            <input type="text" id="new-task" name="task" placeholder="Enter a task" maxlength="200" required>
+            <button type="submit" disabled>Add task</button>
         </form>
         <p id="storage-message" role="status"></p>
+        <div class="toolbar">
+            <button type="button" id="reload-tasks">Reload</button>
+            <button type="button" id="import-tasks" hidden disabled>Import saved tasks</button>
+        </div>
+        <p id="empty-state" hidden>No tasks yet. Create your first checklist above.</p>
         <ul id="list-task"></ul>
     </main>
     <script type="module" src="/script.js"></script>

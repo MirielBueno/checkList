@@ -6,6 +6,11 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
+button:disabled { opacity: 0.55; cursor: wait; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+.toolbar button { background: #303e54; color: #e8edf5; }
+#empty-state { color: #bec9d9; margin-top: 28px; }
 
 body {
     max-width: 1120px;
@@ -98,7 +103,7 @@ button:focus-visible, input:focus-visible {
     height: 8px;
     accent-color: #a7baff;
 }
-.task-actions { display: flex; gap: 12px; margin-top: 20px; }
+.task-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
 .task-actions button { flex: 1; }
 .task-details { margin-top: 24px; padding-top: 24px; border-top: 1px solid #39465a; }
 .task-details[hidden] { display: none; }

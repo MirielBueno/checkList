@@ -1,81 +1,111 @@
 ﻿import { createTaskView } from "./tasks.js";
-import { loadTasks, saveTasks as writeTasks } from "./storage.js";
+import { api } from "./api.js";
+import { loadTasks } from "./storage.js";
 
 const form = document.querySelector("#form-task");
 const taskField = document.querySelector("#new-task");
 const taskList = document.querySelector("#list-task");
-const storageMessage = document.querySelector("#storage-message");
-let storageAvailable = true;
+const message = document.querySelector("#storage-message");
+const reloadButton = document.querySelector("#reload-tasks");
+const importButton = document.querySelector("#import-tasks");
+const emptyState = document.querySelector("#empty-state");
 let tasks = [];
+let ready = false;
 
-try {
-    tasks = loadTasks();
-} catch (error) {
-    storageMessage.textContent = "Saved tasks could not be loaded. Changes will not be saved until you reload successfully.";
-    storageAvailable = false;
-}
-
-
-
-function saveTasks() {
-    if (!storageAvailable) return;
-    try {
-        writeTasks(tasks);
-        storageMessage.textContent = "";
-    } catch (error) {
-        storageMessage.textContent = "Changes could not be saved. Keep this page open and try again.";
-    }
-}
-
-const renderTask = createTaskView(taskList, saveTasks, (task) => {
+function showMessage(text) { message.textContent = text; }
+function updateEmptyState() { emptyState.hidden = !ready || tasks.length > 0; }
+const renderTask = createTaskView(taskList, showMessage, task => {
     tasks = tasks.filter(current => current !== task);
-    saveTasks();
+    updateEmptyState();
     taskField.focus();
 });
 
-form.addEventListener("submit", event => {
+async function refresh() {
+    ready = false;
+    form.querySelector("button").disabled = true;
+    reloadButton.disabled = true;
+    importButton.disabled = true;
+    showMessage("Loading tasks...");
+    try {
+        const loaded = await api.list();
+        tasks = loaded;
+        taskList.replaceChildren();
+        tasks.forEach(task => renderTask(task));
+        ready = true;
+        showMessage("");
+    } catch (error) {
+        showMessage("Could not load tasks. Check the server and database, then click Reload.");
+    } finally {
+        form.querySelector("button").disabled = !ready;
+        reloadButton.disabled = false;
+        importButton.disabled = !ready;
+        updateEmptyState();
+    }
+}
+
+form.addEventListener("submit", async event => {
     event.preventDefault();
     const title = taskField.value.trim();
-    if (!title) return;
-    const task = { title, subtasks: [] };
-    tasks.push(task);
-    renderTask(task, true);
-    saveTasks();
-    taskField.value = "";
+    if (!title || !ready) return;
+    const button = form.querySelector("button");
+    if (button.disabled) return;
+    button.disabled = true;
+    reloadButton.disabled = true;
+    importButton.disabled = true;
+    showMessage("Saving...");
+    try {
+        const task = await api.create(title);
+        tasks.push(task);
+        renderTask(task, true);
+        taskField.value = "";
+        showMessage("");
+        updateEmptyState();
+    } catch (error) {
+        showMessage(error.message || "Could not create task. Please try again.");
+    } finally {
+        button.disabled = false;
+        reloadButton.disabled = false;
+        importButton.disabled = false;
+    }
 });
 
-tasks.forEach(task => renderTask(task));
-
-async function checkServer() {
-    try {
-        const response = await fetch("/api/health");
-
-        if (!response.ok) {
-            throw new Error("Server returned an error");
-        }
-
-        const data = await response.json();
-        console.log("Server status:", data.status);
-    } catch (error) {
-        console.error("Could not connect to the server:", error);
+reloadButton.addEventListener("click", () => {
+    if (taskList.querySelector('[aria-busy="true"]')) {
+        showMessage("Wait for the current change to finish before reloading.");
+        return;
     }
+    refresh();
+});
+
+// O backup antigo fica preservado. O identificador torna a importação repetível sem duplicar.
+try {
+    importButton.hidden = loadTasks().length === 0 || localStorage.getItem("checklist-import-complete") === "true";
+} catch (error) {
+    showMessage("The local backup could not be read.");
 }
-
-checkServer();
-
-async function fetchTasks() {
+importButton.addEventListener("click", async () => {
+    if (!ready || taskList.querySelector('[aria-busy="true"]')) return;
+    importButton.disabled = true;
+    reloadButton.disabled = true;
+    form.querySelector("button").disabled = true;
     try {
-        const response = await fetch("/api/tasks");
-
-        if (!response.ok) {
-            throw new Error("Could not load tasks");
+        const localTasks = loadTasks();
+        let id = localStorage.getItem("checklist-import-id");
+        if (!id) {
+            id = crypto.randomUUID();
+            localStorage.setItem("checklist-import-id", id);
         }
-
-        const serverTasks = await response.json();
-        console.log("Server tasks:", serverTasks);
+        await api.importTasks(id, localTasks);
+        localStorage.setItem("checklist-import-complete", "true");
+        importButton.hidden = true;
+        await refresh();
     } catch (error) {
-        console.error("Could not fetch tasks:", error);
+        showMessage(error.message || "Import failed. Your local backup is unchanged.");
+    } finally {
+        importButton.disabled = !ready;
+        reloadButton.disabled = false;
+        form.querySelector("button").disabled = !ready;
     }
-}
+});
 
-fetchTasks();
+refresh();
