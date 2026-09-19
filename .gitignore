@@ -4,7 +4,6 @@ node_modules/
 .env
 .env.*
 !.env.example
-prod-ca-2021.crt
 
 # Local agent instructions
 [Aa][Gg][Ee][Nn][Tt][Ss].[Mm][Dd]
